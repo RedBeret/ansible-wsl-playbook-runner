@@ -1,0 +1,58 @@
+---
+- name: Test Ansible on localhost
+  hosts: localhost
+  gather_facts: yes
+  tasks:
+      - name: Print a message
+        debug:
+            msg: 'Ansible is working on localhost!'
+
+      - name: Create a test file
+        file:
+            path: /tmp/ansible_test_file.txt
+            state: touch
+
+      - name: Check the operating system version
+        win_stat:
+            path: 'C:\Windows'
+        register: win_stat_output
+        when: ansible_os_family == "Windows"
+
+      - name: Verify if the OS is Windows 11
+        fail:
+            msg: 'This system is not running Windows 11!'
+        when: ansible_distribution_version != "10.0.22000"
+
+      - name: Gather system facts
+        setup:
+            gather_subset:
+                - 'hardware'
+                - 'network'
+        register: system_facts
+
+      - name: Check disk usage on C drive
+        win_disk_facts: {}
+        register: win_disk_facts
+        when: ansible_os_family == "Windows"
+
+      - name: Set C drive size available
+        set_fact:
+            c_drive_size_available: "{{ win_disk_facts['ansible_mounts'][0]['size_available'] | int }}"
+        when: ansible_os_family == "Windows"
+
+      - name: Set C drive total size
+        set_fact:
+            c_drive_size_total: "{{ win_disk_facts['ansible_mounts'][0]['size_total'] | int }}"
+        when: ansible_os_family == "Windows"
+
+      - name: Calculate C drive free space percentage
+        set_fact:
+            c_drive_free_percent: '{{ (c_drive_size_available * 100) / c_drive_size_total | float }}'
+        when: ansible_os_family == "Windows"
+
+      - name: Fail if C drive has less than 10% free space
+        fail:
+            msg: 'C: drive has less than 10% free space!'
+        when:
+            - ansible_os_family == "Windows"
+            - c_drive_free_percent < 10
