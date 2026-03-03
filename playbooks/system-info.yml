@@ -1,0 +1,40 @@
+---
+# Collect and display system information from the WSL environment.
+# Useful as a baseline health check before running other playbooks.
+- name: System information report
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  tasks:
+    - name: OS and kernel
+      ansible.builtin.debug:
+        msg:
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Kernel: {{ ansible_kernel }}"
+          - "Architecture: {{ ansible_architecture }}"
+
+    - name: CPU info
+      ansible.builtin.debug:
+        msg: "CPUs: {{ ansible_processor_vcpus }} vCPUs ({{ ansible_processor[2] | default('unknown') }})"
+
+    - name: Memory info
+      ansible.builtin.debug:
+        msg: "RAM: {{ (ansible_memtotal_mb / 1024) | round(1) }} GB total, {{ (ansible_memfree_mb / 1024) | round(1) }} GB free"
+
+    - name: Disk usage
+      ansible.builtin.command: df -h --output=source,size,used,avail,pcent,target -x tmpfs -x devtmpfs
+      register: df_output
+      changed_when: false
+
+    - name: Show disk usage
+      ansible.builtin.debug:
+        var: df_output.stdout_lines
+
+    - name: Network interfaces
+      ansible.builtin.debug:
+        msg: "Interface {{ item.key }}: {{ item.value.ipv4.address | default('no IPv4') }}"
+      loop: "{{ ansible_interfaces | map('extract', ansible_facts) | list | selectattr('ipv4', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when: ansible_interfaces is defined

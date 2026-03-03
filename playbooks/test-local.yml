@@ -1,0 +1,42 @@
+---
+# Smoke test — runs on WSL localhost, no Windows modules required.
+# Verifies Ansible is functional and reports basic system facts.
+- name: Ansible WSL smoke test
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  tasks:
+    - name: Confirm Ansible is reachable
+      ansible.builtin.debug:
+        msg: "Ansible is running on {{ ansible_hostname }} ({{ ansible_distribution }} {{ ansible_distribution_version }})"
+
+    - name: Create a temporary marker file
+      ansible.builtin.file:
+        path: /tmp/ansible_smoke_test
+        state: touch
+        mode: "0644"
+
+    - name: Verify marker file exists
+      ansible.builtin.stat:
+        path: /tmp/ansible_smoke_test
+      register: marker
+
+    - name: Fail if marker file was not created
+      ansible.builtin.fail:
+        msg: "Marker file was not created — filesystem write may be broken"
+      when: not marker.stat.exists
+
+    - name: Report disk usage on WSL root
+      ansible.builtin.command: df -h /
+      register: disk_output
+      changed_when: false
+
+    - name: Show disk usage
+      ansible.builtin.debug:
+        var: disk_output.stdout_lines
+
+    - name: Clean up marker file
+      ansible.builtin.file:
+        path: /tmp/ansible_smoke_test
+        state: absent
